@@ -75,11 +75,12 @@ def move_mesh(domain,wi,m):
     # for this 1d problem but would be helpful for higher dimensions)
 
     V = FunctionSpace(domain, ("CG", 1))
+    H = domain.geometry.x.max()
     L = domain.geometry.x.min()
 
     w_top = wi.x.array[-1] + m
 
-    facets_t = locate_entities_boundary(domain, domain.topology.dim-1, lambda x: np.isclose(x[0],0))
+    facets_t = locate_entities_boundary(domain, domain.topology.dim-1, lambda x: np.isclose(x[0],H))
     facets_b = locate_entities_boundary(domain, domain.topology.dim-1, lambda x: np.isclose(x[0],L))
         
     dofs_t = locate_dofs_topological(V, domain.topology.dim-1, facets_t)

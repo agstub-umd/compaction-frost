@@ -5,10 +5,10 @@ from dolfinx.fem import (Expression, Function, FunctionSpace, dirichletbc,
 from dolfinx.fem.petsc import NonlinearProblem
 from dolfinx.mesh import locate_entities_boundary
 from dolfinx.nls.petsc import NewtonSolver
-from misc import C, D, K, interp, max, move_mesh, sat, temp, w_ice
+from misc import C, D, K, interp, max, move_mesh, sat, sign, temp, w_ice
 from mpi4py import MPI
+from params import dt, nt, nz, phi_min, theta
 from petsc4py import PETSc
-from params import Ts, dt, nt, nz, phi_min, theta
 from ufl import (Dx, FiniteElement, SpatialCoordinate, TestFunction,
                  TestFunctions, ds, dx, split)
 
@@ -23,9 +23,13 @@ def weak_form(w,w_t,w_n,phi,phi_t,phi_n,Gamma,domain):
     S = sat(T)
     wi = w_ice(w,phi,S,Gamma)
 
+    # # possible Neumann condition
+    # L = domain.geometry.x.min() 
+    # f = 1e0*(1+sign(x[0]-0.5*L))*0.5
+
     # weak form of momentum balance:
     F_w =  D(phi)*Dx(w,0)*Dx(w_t,0)*dx  + (C(phi,S)-Gamma)*w_t*dx + (1/K(S))*((1-phi*S)*w + phi*S*wi)*w_t*dx
-    F_w += phi*S*(1+T)*Dx(w_t,0)*dx - phi*S*(1+Ts)*w_t*ds 
+    F_w += phi*S*(1+T)*Dx(w_t,0)*dx - phi*S*(1+T)*w_t*ds #+ f*w_t*ds
 
     # weak form of porosity evolution:
     F_phi = (phi-phi_n)*phi_t*dx + dt*w_theta*Dx(phi_theta,0)*phi_t*dx - dt*(1-phi_theta)*Dx(w_theta,0)*phi_t*dx 
@@ -39,9 +43,14 @@ def weak_form_vel(w,w_t,phi,Gamma,domain):
     x = SpatialCoordinate(domain)
     T = temp(x[0])
     S = sat(T)
-    wi = w_ice(w,phi,S,Gamma) 
+    wi = w_ice(w,phi,S,Gamma)
+
+    # # possible Neumann condition
+    # L = domain.geometry.x.min() 
+    # f = 1e0*(1+sign(x[0]-0.5*L))*0.5
+
     F_w =  D(phi)*Dx(w,0)*Dx(w_t,0)*dx  + (C(phi,S)-Gamma)*w_t*dx + (1/K(S))*((1-phi*S)*w + phi*S*wi)*w_t*dx
-    F_w += phi*S*(1+T)*Dx(w_t,0)*dx - phi*S*(1+Ts)*w_t*ds 
+    F_w += phi*S*(1+T)*Dx(w_t,0)*dx - phi*S*(1+T)*w_t*ds #+ f*w_t*ds
     return F_w 
 
 
@@ -67,7 +76,7 @@ def solve_pde(domain,sol_n,Gamma):
         dofs_b = locate_dofs_topological(V.sub(0), domain.topology.dim-1, facets_b)
         bc_b = dirichletbc(PETSc.ScalarType(0), dofs_b,V.sub(0))      # w = 0 at base  
 
-        bcs = [] #[bc_b]    
+        bcs = []    
 
         # set initial guess for Newton solver to be the solution 
         # from the previous time step:
@@ -167,7 +176,7 @@ def vel_solve(domain,phi,Gamma):
         dofs_b = locate_dofs_topological(V, domain.topology.dim-1, facets_b)
         bc_b = dirichletbc(PETSc.ScalarType(0), dofs_b,V)    # w = 0 at base  
 
-        bcs = [] #[bc_b] 
+        bcs = [] 
 
         # initial guess for Newton solver
         w.interpolate(lambda x: (x[0]-L)/L )

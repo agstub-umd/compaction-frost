@@ -1,14 +1,14 @@
 # This file contains the functions needed for solving the compaction problem.
 import numpy as np
-from constitutive import N, Q, Sigma, perm, q, sat, temp, Pi
-from dolfinx.fem import (Constant, Function, FunctionSpace, dirichletbc,
+from constitutive import N, Q, Sigma, perm, q, sat, temp, Pi, Lamda
+from dolfinx.fem import (Expression, Constant, Function, FunctionSpace, dirichletbc,
                          locate_dofs_topological)
 from dolfinx.fem.petsc import NonlinearProblem
 from dolfinx import log
 from dolfinx.mesh import create_interval,locate_entities_boundary
 from dolfinx.nls.petsc import NewtonSolver
 from mpi4py import MPI
-from params import CFL, G, nu, nz, phi_max, phi_min, theta, zf
+from params import CFL, G, nu, nz, phi_max, phi_min, theta
 from petsc4py import PETSc
 from post_process import interp
 from ufl import (Dx, SpatialCoordinate,
@@ -38,25 +38,19 @@ def weak_form_sed(w,w_t,phi,wi,Nf,domain):
     K = perm(S)
 
     zl = domain.geometry.x[:,0].max()
-    zf = domain.geometry.x[:,0].min()
-    zm = 0.5*(zf+zl)
+    zb = domain.geometry.x[:,0].min()
+    zm = 0.5*(zb+zl)
     
     # body integral terms:
     F_w =  -N(phi,w)*Dx(w_t,0)*dx  + G*(1-phi)*(nu-1)*w_t*dx - (1-phi*S)*(q(w,wi,phi,S)/K)*w_t*dx
     F_w += (1+T)*Dx(phi*S,0)*w_t*dx  
 
     # boundary integral terms:
-    F_w -= Nf*conditional(le(x[0],zm),1,0)*w_t*ds              # effective stress at fringe
-    # F_w -= 2*Pi(phi)*conditional(le(x[0],zm),1,0)*w_t*ds     # effective stress at fringe
+    # Nf0 = Pi(phi) - Lamda(phi)*w*Dx(phi,0)
+    F_w -= Nf*conditional(le(x[0],zm),1,0)*w_t*ds # effective stress at base of fringe
 
- 
-    Nl = (1-phi*S)*((1+T) - Sigma(wi,phi,S)/(phi*S))           # effective stress below ice lens
+    Nl = (1-phi*S)*(1+T) + Sigma(wi,phi,S)        # effective stress below ice lens
     F_w += Nl*w_t*conditional(ge(x[0],zm),1,0)*ds 
-
-    ##(!!!) alternative BC: 
-    # m = Q(phi,S)/(1-phi*S)
-    # pen = Constant(domain, PETSc.ScalarType(1e6))
-    # F_w += pen*(wi-(w+m))*conditional(ge(x[0],zm),1,0)*w_t*ds  # penalty velocity BC at top
     return F_w 
 
 def weak_form_ice(w,phi,wi,wi_t,domain):
@@ -67,8 +61,8 @@ def weak_form_ice(w,phi,wi,wi_t,domain):
      K = perm(S)
 
      zl = domain.geometry.x[:,0].max()
-     zf = domain.geometry.x[:,0].min()
-     zm = 0.5*(zf+zl)
+     zb = domain.geometry.x[:,0].min()
+     zm = 0.5*(zb+zl)
 
      m = Q(phi,S)/(1-phi*S)
   
@@ -78,10 +72,6 @@ def weak_form_ice(w,phi,wi,wi_t,domain):
      # boundary integral terms: 
      pen = Constant(domain, PETSc.ScalarType(1e6))
      F_i += pen*(wi-(w+m))*conditional(ge(x[0],zm),1,0)*wi_t*ds  
-
-     ##(!!!) alternative BC: 
-     # Sigma_l = (phi*S/(1-phi*S))*((1-phi*S)*(1+T)-N(phi,w))
-     #  F_i += Sigma_l*wi_t*conditional(ge(x[0],zm),1,0)*ds # ice lens stress at top
      return F_i 
 
 def pde_solve(Nf,domain,sol_n,dt):
@@ -94,12 +84,21 @@ def pde_solve(Nf,domain,sol_n,dt):
         (w,wi,phi) = split(sol)
         (w_n,wi_n,phi_n) = split(sol_n)
         (w_t,wi_t,phi_t) = TestFunctions(V)
-     
+
+   
+        w_b =  0.0 
+
+        # set Dirichlet bc's
         zb = domain.geometry.x[:,0].min()
-        facets_b = locate_entities_boundary(domain, domain.topology.dim-1, lambda x: np.isclose(x[0],zb))
-        dofs_b = locate_dofs_topological(V.sub(1), domain.topology.dim-1, facets_b)
-        bc_b = dirichletbc(PETSc.ScalarType(0), dofs_b,V.sub(1))    # wi = 0 at base of fringe 
-        bcs = [bc_b]
+        facets = locate_entities_boundary(domain, domain.topology.dim-1, lambda x: np.isclose(x[0],zb))
+        dofs = locate_dofs_topological(V.sub(0), domain.topology.dim-1, facets)
+        bc_s = dirichletbc(PETSc.ScalarType(w_b), dofs,V.sub(0))    # ws at base of fringe 
+
+        dofs_i = locate_dofs_topological(V.sub(1), domain.topology.dim-1, facets)
+        bc_i = dirichletbc(PETSc.ScalarType(w_b), dofs_i,V.sub(1))    # wi at base of fringe 
+
+        # bcs = [bc_s,bc_i]
+        bcs = [bc_i]
 
         # # Define weak form:
         F = weak_form(w,w_t,w_n,phi,phi_t,phi_n,wi,wi_t,Nf,domain,dt)
@@ -147,12 +146,21 @@ def initial_solve(domain,phi,Nf):
         # Define weak form
         F = weak_form_sed(w,w_t,phi,wi,Nf,domain) + weak_form_ice(w,phi,wi,wi_t,domain)
 
+
+        # set sediment velocity at base related to water flux bc 
+        w_b = 0.0 
+    
         # Define Dirichlet boundary conditions at base of fringe (wi=0)
         zb = domain.geometry.x[:,0].min()
         facets_b = locate_entities_boundary(domain, domain.topology.dim-1, lambda x: np.isclose(x[0],zb))
-        dofs_b = locate_dofs_topological(V.sub(1), domain.topology.dim-1, facets_b)
-        bc_b = dirichletbc(PETSc.ScalarType(0), dofs_b,V.sub(1))    
-        bcs = [bc_b]
+        dofs_i = locate_dofs_topological(V.sub(1), domain.topology.dim-1, facets_b)
+        bc_i = dirichletbc(PETSc.ScalarType(w_b), dofs_i,V.sub(1)) #wi at base of fringe
+     
+        dofs_s = locate_dofs_topological(V.sub(0), domain.topology.dim-1, facets_b)
+        bc_s = dirichletbc(PETSc.ScalarType(w_b), dofs_s,V.sub(0))    # ws at base of fringe
+
+        # bcs = [bc_i,bc_s]
+        bcs = [bc_i]
 
         # Solve for w
         problem = NonlinearProblem(F, sol, bcs=bcs)
@@ -197,7 +205,7 @@ def full_solve(domain,initial,Nf,t_0,t_max,dt0):
     j = 0       # total number of solve attempts
     t = t_0
     converged = True  # convergence flag
-    C = 0.25          # CFL constant
+    C = 0.5          # CFL constant
 
     C_fine0 = 0.1     # CFL constant for fine timestepping
     C_fine = C_fine0
@@ -207,7 +215,7 @@ def full_solve(domain,initial,Nf,t_0,t_max,dt0):
     N_min = Nf
 
     # time-stepping loop
-    c_count = 11
+    c_count = 16
     print('Time stepping...')
     while t<t_max and (i<nt and j<10*nt):
 
@@ -224,8 +232,9 @@ def full_solve(domain,initial,Nf,t_0,t_max,dt0):
                     
         if dt > 10*dt_prev and i>2:
             dt = 2*dt_prev   
-               
-        print('iteration '+str(i)+': time = '+'{:.3f}'.format(t)+' out of '+'{:.2f}'.format(t_max)+',  dt = '+'{:.1f}'.format(100*dt/dt0)+'% of dt0, N_min = '+'{:.3f}'.format(N_min)+'  \r',end='')
+
+        if i>0:
+            print('iteration '+str(i)+': time = '+'{:.3f}'.format(t)+' out of '+'{:.2f}'.format(t_max)+',  dt = '+'{:.1f}'.format(100*dt/dt0)+'% of dt0, N_min = '+'{:.3f}'.format(N_min)+'  \r',end='')
 
         # solve the compaction problem for sol = (w_s,w_i,phi)
         sol,converged = pde_solve(Nf,domain,sol_n,dt)
@@ -273,11 +282,12 @@ def full_solve(domain,initial,Nf,t_0,t_max,dt0):
                 # initiate new lens position where effective stress vanishes
                 l = np.argmin(N_i)
                 z_n = z_i[l]
-                z_new = np.linspace(zf,z_n,nz+1)
+                zb = z_i.min()
+                z_new = np.linspace(zb,z_n,nz+1)
                 phi_n = interp1d(z_i[0:l],phi_i[0:l],fill_value='extrapolate')
                 ws_n = interp1d(z_i[0:l],ws_i[0:l],fill_value='extrapolate')
                 wi_n = interp1d(z_i[0:l],wi_i[0:l],fill_value='extrapolate')
-                domain = create_interval(MPI.COMM_WORLD,nz,[zf,z_n])
+                domain = create_interval(MPI.COMM_WORLD,nz,[zb,z_n])
                 V0 = FunctionSpace(domain, ("CG", 1))
                 V = mixed_space(domain)
                 phi_ = Function(V0)
@@ -295,7 +305,8 @@ def full_solve(domain,initial,Nf,t_0,t_max,dt0):
                 # displace the mesh according to the velocity solution
                 z = domain.geometry.x
                 zl = z[:,0].max()
-                z[:,0] += dt*ws_i[-1]*(z[:,0]-zf)/(zl-zf)
+                zb = z[:,0].min()
+                z[:,0] += dt*(ws_i[-1]+0*1)*(z[:,0]-zb)/(zl-zb)
        
             t += dt
             i += 1

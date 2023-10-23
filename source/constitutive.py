@@ -2,7 +2,7 @@
 
 import numpy as np
 from params import (Ki, Ks, Kw, Tf, Tm, Ts, Tz0, Tz_sc, a, alpha, b, beta,
-                    gamma, z_sc)
+                    gamma, z_sc,phi0)
 from ufl import Dx
 
 
@@ -32,7 +32,7 @@ def temp(z):
      # undercooling temperature as a function of z
      return (Tf-Ts + Tz0*z_sc*z)/(Tm-Tf)
 
-def L(phi):
+def Lamda(phi):
      # viscosity (coefficient on dw/dz)
      return gamma*(4./3. + 1/phi)  
 
@@ -42,7 +42,11 @@ def Ke(phi,S):
 
 def Pi(phi):
      # sediment yield stress as a function of phi
+     e = phi/(1-phi)
+     e0 = phi0/(1-phi0)
+     Pi_T = alpha*(10**((e0-e)/0.15))
      return alpha*((1-phi)**3)/phi**2
+     # return Pi_T
 
 def Sigma(wi,phi,S):
      # scaled deviatoric ice stress
@@ -50,11 +54,11 @@ def Sigma(wi,phi,S):
 
 def Q(phi,S):
      # jump in heat flux across ice lenses
-     return (1-Ke(phi,S))*Tz_sc
+     return 0#(1-Ke(phi,S))*Tz_sc
 
 def N(phi,w):
      # effective pressure of unfrozen material
-     return Pi(phi)  - (1-phi)*L(phi)*Dx(w,0) 
+     return - (1-phi)*Lamda(phi)*Dx(w,0)  + Pi(phi)  
 
 def q(w,wi,phi,S):
      # water flux

@@ -6,9 +6,7 @@ k0 = 1e-17                                    # permeability pre-factor [m^2]
 Ts = 272                                      # temperature at surface [K]
 Tz0 = 25/1e3                                  # temperature gradient [K/m]
 eta_i = 1e16                                  # ice viscosity [Pa s]
-phi0 = 0.3                                    # initial porosity
-
-discrete_lens = True
+phi0 = 0.44                                    # initial porosity
 
 # physical parameters:
 g = 9.81                                      # gravitational acceleration [m/s^2]
@@ -39,10 +37,10 @@ stress_sc = ((4./3.)*eta + zeta)*w_sc/z_sc
 # nondimensional parameters
 G = rho_w*g*z_sc/N_sc
 nu = rho_s/rho_w
-gamma = 1e-1 #((4./3.)*eta + zeta)*w_sc/(N_sc*z_sc) # [sediment stess] / [N] 
-alpha = 1e-1  #1e4/N_sc                             # plasticity [Pi]/[N]
-beta = (4./3.)*eta_i*(w_sc/z_sc)/N_sc               # [ice stress] / [N]
-Tz_sc = Tz0*z_sc/(Tm-Tf)                            # dimensionless temp. gradient
+gamma = 1e-1     # ((4./3.)*eta + zeta)*w_sc/(N_sc*z_sc)  # [sediment stess] / [N] 
+alpha = 1e-1     #0.015    # 1e3/N_sc                    # plasticity [Pi]/[N]
+beta = 2e1 #(4./3.)*eta_i*(w_sc/z_sc)/N_sc               # [ice stress] / [N]
+Tz_sc = Tz0*z_sc/(Tm-Tf)                                 # dimensionless temp. gradient
 
 # domain parameters:
 nz = 500                                        # Number of elements in z direction
@@ -57,7 +55,3 @@ CFL = 0.25                                      # CFL constant for timestepping
 # misc:
 phi_min = 0.01                                  # minimum porosity constraint
 phi_max = 0.99                                  # maximum porosity constraint
-
-# print(gamma)
-# print(beta)
-# print(1e4/N_sc)

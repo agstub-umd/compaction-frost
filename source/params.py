@@ -49,7 +49,6 @@ zf = (Ts-Tf)/(Tz0*z_sc)                         # base of fringe position
 # time-stepping parameters:
 theta = 0.5                                     # time-integration parameter 
                                                 # (0=forward euler, 0.5 = trapezoid, 1 = backward euler)
-
 CFL = 0.25                                      # CFL constant for timestepping
 
 # misc:

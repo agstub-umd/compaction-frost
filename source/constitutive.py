@@ -1,26 +1,21 @@
 # this file contains some helper functions for the compaction problem solver
 
 import numpy as np
-from params import (Ki, Ks, Kw, Tf, Tm, Ts, Tz0, Tz_sc, a, alpha, b, beta,
-                    gamma, z_sc,phi0)
+from params import Tf, Tm, Ts, Tz0, a, b, gamma, z_sc
 from ufl import Dx
 
-
-def Max(f1,f2):
-     # max function
-     return 0.5*(f1+f2 + ((f1-f2)**2)**0.5)
 
 def perm(S):
       # scaled permeability as a function of ice saturation
       return (1-S)**a
 
+def Max(f1,f2):
+     # max function
+     return 0.5*(f1+f2 + ((f1-f2)**2)**0.5)
+
 def sign(f):
      # regularized sign function
      return f/(abs(f)+1e-20)
-
-def step(f):
-     # smoothed step function
-     return 1/(1+np.exp(1)**(-200*f))
 
 def sat(T):
      # ice saturation as a function of temperature
@@ -36,31 +31,19 @@ def Lamda(phi):
      # viscosity (coefficient on dw/dz)
      return gamma*(4./3. + 1/phi)  
 
-def Ke(phi,S):
-     # effective thermal conductivity
-     return (Kw**(phi*(1-S)))*(Ks**(1-phi))/(Ki**(1-phi*S)) 
+def Nc(phi,w):
+     # deviatoric effective stress (compaction)
+     return - (1-phi)*Lamda(phi)*Dx(w,0)  
 
-def Pi(phi):
-     # sediment yield stress as a function of phi
-     e = phi/(1-phi)
-     e0 = phi0/(1-phi0)
-     Pi_T = alpha*(10**((e0-e)/0.15))
-     return alpha*((1-phi)**3)/phi**2
-     # return Pi_T
+def q(w,phi,S):
+     # water flux relative to rigid solution
+     return -(1-phi*S)*w 
 
-def Sigma(wi,phi,S):
-     # scaled deviatoric ice stress
-     return beta*phi*S*Dx(wi,0)
+def qr(V_heave,phi,S):
+     # water flux for rigid solution
+     # V_heave = v_i - v_s
+     return (1-phi*S)*V_heave
 
-def Q(phi,S):
-     # jump in heat flux across ice lenses
-     return 0#(1-Ke(phi,S))*Tz_sc
-
-def N(phi,w):
-     # effective pressure of unfrozen material
-     return - (1-phi)*Lamda(phi)*Dx(w,0)  + Pi(phi)  
-
-def q(w,wi,phi,S):
-     # water flux
-     return (1-phi*S)*(wi-w) 
-
+# def Q(phi,S):
+#      # jump in heat flux across ice lenses
+#      return 0#(1-Ke(phi,S))*Tz_sc

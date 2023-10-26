@@ -1,48 +1,36 @@
 import matplotlib.pyplot as plt 
 import matplotlib.pylab as pl
 import numpy as np 
-from constitutive import sat,temp, Pi
+from constitutive import sat,temp 
 from params import zf
 
-def plot(ws,wi,phi,z,N_,timesteps):
-    ind = np.arange(0,timesteps.size,1)
-    colors = pl.cm.plasma_r(timesteps[ind]/timesteps.max())
-    plt.figure(figsize=(12,6))
+def plot(ws,phi,N,Nr,z,timesteps):
+    colors = pl.cm.plasma_r(timesteps/timesteps.max())
+    plt.figure(figsize=(8,6))
   
-    plt.subplot(151)
-    for i in range(ind.size):
-        plt.plot(ws[ind[i],:],z[ind[i],:],color=colors[i],alpha=0.5)  
-    plt.xlabel(r'$w_\mathrm{s}$',fontsize=16)
+    plt.subplot(131)
+    plt.axhline(zf,color='k',linestyle='--')
+    for i in range(timesteps.size):
+        plt.plot(ws[i,:],z[i,:],color=colors[i])  
+    plt.xlabel(r'$v_\mathrm{s}^*$',fontsize=16)
     plt.ylabel(r'$z$',fontsize=16)
 
-    plt.subplot(152)
-    for i in range(ind.size):
-        plt.plot(wi[ind[i],:],z[ind[i],:],color=colors[i],alpha=0.5)  
-    plt.xlabel(r'$w_\mathrm{i}$',fontsize=16)
-    plt.gca().set_yticks([])
-
-    plt.subplot(153)
-    for i in range(ind.size):
-        S = sat(temp(z[ind[i],:]))
-        q = (1-phi[ind[i],:]*S)*(wi[ind[i],:]-ws[ind[i],:])
-        plt.plot(q,z[ind[i],:],color=colors[i],alpha=0.5)  
-    plt.xlabel(r'$q$',fontsize=16)
-    plt.gca().set_yticks([])
-
-    plt.subplot(154)
-    for i in range(ind.size):
-        plt.plot(N_[ind[i],:],z[ind[i],:],color=colors[i],alpha=0.5)
+    plt.subplot(132)
+    plt.axhline(zf,color='k',linestyle='--')
+    plt.axvline(0,color='indigo',linestyle='--')
+    for i in range(timesteps.size):
+        plt.plot(N[i,:],z[i,:],color=colors[i])
+        # plt.plot(Nr[i,:],z[i,:],color='k')  
     plt.xlabel(r'$N$',fontsize=16)
     plt.gca().set_yticks([])
 
-    plt.subplot(155)
-    for i in range(ind.size):
-        S = sat(temp(z[ind[i],:]))
-        plt.plot(phi[ind[i],:],z[ind[i],:],color=colors[i],alpha=0.5)
-        # plt.plot(S,z[ind[i],:],'crimson')
 
+    plt.subplot(133)
+    plt.axhline(zf,color='k',linestyle='--')
+    for i in range(timesteps.size):
+        plt.plot(phi[i,:],z[i,:],color=colors[i])
+ 
     plt.xlim(-0.1,1.1)
-    # plt.axvline(x=phi_c,color='k',linestyle='--',linewidth=1)
     plt.xlabel(r'$\phi$',fontsize=16)
     plt.gca().yaxis.set_label_position("right")
     plt.gca().yaxis.tick_right()
@@ -52,60 +40,32 @@ def plot(ws,wi,phi,z,N_,timesteps):
 
 
 
-def plot_movie(ws,wi,phi,z,N_,timesteps):    
-    q = (1-phi*sat(temp(z)))*(wi-ws)
-    ind = np.arange(0,timesteps.size,1)
+def plot_movie(ws,phi,N,Nr,z,timesteps):    
+    ind = np.arange(0,timesteps.size,2)
     for i in range(ind.size):
-        plt.figure(figsize=(12,6))
+        plt.figure(figsize=(8,6))
         plt.suptitle(r'$t/t_\mathrm{max}=$'+'{:.2f}'.format(timesteps[ind[i]]/timesteps.max()),fontsize=24)
-        plt.subplot(151)
+        plt.subplot(131)
         plt.plot(ws[ind[i],:],z[ind[i],:],color='indigo')  
-        plt.xlabel(r'$w_\mathrm{s}$',fontsize=16)
+        plt.xlabel(r'$v_\mathrm{s}^*$',fontsize=16)
         plt.ylabel(r'$z$',fontsize=16)
         plt.xlim(ws.min()-0.1,ws.max()+0.1)
         plt.ylim(z[ind,:].min(),z[ind,:].max())
-        # plt.axhline(y=z[ind[i],:].max(),color='lightsteelblue',linewidth=4,linestyle='-')
-        plt.axhline(y=zf,color='burlywood',linewidth=2,linestyle='-')
+        plt.axhline(y=zf,color='k',linewidth=1,linestyle='-')
 
-        plt.subplot(152)
-        plt.plot(wi[ind[i],:],z[ind[i],:],color='indigo')  
-        plt.xlabel(r'$w_\mathrm{i}$',fontsize=16)
-        plt.gca().set_yticks([])
-        plt.xlim(wi.min()-0.1,wi.max()+0.1)
-        plt.ylim(z[ind,:].min(),z[ind,:].max())
-        # plt.axhline(y=z[ind[i],:].max(),color='lightsteelblue',linewidth=4,linestyle='-')
-        plt.axhline(y=zf,color='burlywood',linewidth=2,linestyle='-')
-
-
-        plt.subplot(153)
-        S = sat(temp(z[ind[i],:]))
-        plt.plot(q[ind[i],:],z[ind[i],:],color='indigo')  
-        plt.xlabel(r'$q$',fontsize=16)
-        plt.gca().set_yticks([])
-        plt.xlim(q.min()-0.1,q.max()+0.1)
-        plt.ylim(z[ind,:].min(),z[ind,:].max())
-        # plt.axhline(y=z[ind[i],:].max(),color='lightsteelblue',linewidth=4,linestyle='-')
-        plt.axhline(y=zf,color='burlywood',linewidth=2,linestyle='-')
-
-
-
-        plt.subplot(154)
-        plt.plot(N_[ind[i],:],z[ind[i],:],color='indigo',label=r'$N$')
-        plt.plot(Pi(phi[ind[i],:]),z[ind[i],:],color='crimson',linestyle='--',alpha=0.5,label=r'$\Pi$')  
+        plt.subplot(132)
+        plt.plot(N[ind[i],:],z[ind[i],:],color='indigo')  
         plt.xlabel(r'$N$',fontsize=16)
         plt.gca().set_yticks([])
-        plt.xlim(N_.min()-0.1,N_.max()+0.1)
+        plt.xlim(-0.1,+N.max())
         plt.ylim(z[ind,:].min(),z[ind,:].max())
-        plt.axvline(x=0,linestyle='--',color='k')
-        plt.legend(fontsize=12,loc='upper right')
-        # plt.axhline(y=z[ind[i],:].max(),color='lightsteelblue',linewidth=4,linestyle='-')
-        plt.axhline(y=zf,color='burlywood',linewidth=2,linestyle='-')
+        plt.axvline(x=0,color='indigo',linewidth=1,linestyle='--')
+        plt.axhline(y=zf,color='k',linewidth=1,linestyle='-')
 
 
-        plt.subplot(155)
+        plt.subplot(133)
         plt.plot(phi[ind[i],:],z[ind[i],:],color='indigo')
-        # plt.axhline(y=z[ind[i],:].max(),color='lightsteelblue',linewidth=4,linestyle='-')
-        plt.axhline(y=zf,color='burlywood',linewidth=2,linestyle='-')
+        plt.axhline(y=zf,color='k',linewidth=1,linestyle='-')
         plt.xlim(0,1)
         plt.ylim(z[ind,:].min(),z[ind,:].max())
         plt.xlabel(r'$\phi$',fontsize=16)

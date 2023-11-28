@@ -1,6 +1,6 @@
 # This file contains the functions needed for solving the compaction problem.
 import numpy as np
-from constitutive import D, Phi, dPhi, get_fields, perm, sat, temp
+from constitutive import D, Phi, dPhi, get_fields
 from dolfinx.fem import (Constant, Function, FunctionSpace, dirichletbc,
                          locate_dofs_topological)
 from dolfinx.fem.petsc import NonlinearProblem
@@ -10,7 +10,7 @@ from mpi4py import MPI
 from params import G, nu, nz
 from petsc4py import PETSc
 from post_process import interp
-from ufl import Dx, Measure, SpatialCoordinate, TestFunction, ds, dx
+from ufl import Dx, Measure, SpatialCoordinate, TestFunction, ds
 
 
 def weak_form(N,N_t,N_prev,v_i,domain,dt,eps,penalty,steady):
@@ -51,6 +51,7 @@ def solve_pde(domain,N_prev,N_f,v_i,dt,eps=1e-10,penalty = False,steady=False):
         N = Function(V)
         N_t = TestFunction(V)
 
+        # define weak form
         F = weak_form(N,N_t,N_prev,v_i,domain,dt,eps,penalty=penalty,steady=steady)  
 
         x = SpatialCoordinate(domain)
@@ -90,36 +91,36 @@ def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10,penalty=False):
     # solve the compaction problem given:
     # domain: the computational domain
     # initial: initial conditions 
- 
+    # N_f: effective stress at base of fringe
+    # v_i: pulling speed 
+    # timesteps: array of time steps
+    # eps: diffusivity regularization parameter
+    # penalty: flag for whether to enforce BC with penalty method
     # *see example.ipynb for an example of how to set these
     #
     # The solver returns:
     # N: effective stress (solution)
     # z: domain coordinates (change over time due ice lens motion)
+    # new_lens: array of time steps when a new lens forms (new lens == 1, otherwise 0)
 
     dt = timesteps[1]-timesteps[0]
     nt = np.size(timesteps)
 
+    # create arrays for saving solution
     N = np.zeros((nt,nz+1))
     z = np.zeros((nt,nz+1))
-
     new_lens = np.zeros(nt)
 
     V = FunctionSpace(domain, ("CG", 1)) 
     sol_n = Function(V)
     sol_n.interpolate(initial)
 
-    N_min = 1
-
-    dt = timesteps[1]-timesteps[0]
-
-    lens_count = 0
-
     # time-stepping loop
     for i in range(nt):
 
         if i>0:
-            print('time step '+str(i+1)+' out of '+str(nt)+', N_min = '+'{:.2f}'.format(N_min)+', ('+str(lens_count)+' ice lenses)'+' \r',end='')
+            print('time step '+str(i+1)+' out of '+str(nt)+', N_min = '+'{:.2f}'.format(N_min)
+                  +', ('+str(np.size(np.where(new_lens==1)))+' ice lenses)'+' \r',end='')
            
         # solve the compaction problem for sol = N
         sol = solve_pde(domain,sol_n,N_f,v_i,dt,eps,steady=False,penalty=penalty)
@@ -133,28 +134,21 @@ def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10,penalty=False):
         N_min = N_i.min()
 
         if N_min <= 0.05: 
-        #   initiate new lens position where effective stress reaches threshold value
-            lens_count += 1  
-            new_lens[i] = 1          
+        #  initiate new lens position where effective stress reaches threshold value
+           
+            # set flag to 1 for lens initiation times 
+            new_lens[i] = 1 
+
+            # create new domain [z_b, z_n] where z_n corresponds to minimum
+            # where the effective stress N reaches threshold          
             l = np.argmin(N_i)
             z_n = z_i[l]
             z_b = z_i.min()
-            
             domain = create_interval(MPI.COMM_WORLD,nz,[z_b,z_n])
-            
-            V = FunctionSpace(domain, ("CG", 1))
-            guess = Function(V)
-            guess.interpolate(lambda x: 0.1*(x[0]-z_b)/(z_n-z_b) + Phi(N_f))         
-    
-            sol_n = Function(V)
-            sol_n.interpolate(lambda x: 0.001*(x[0]-z_b)/(z_l-z_b) + N_f)
-            sol_n = solve_pde(domain,sol_n,N_f,0,dt,eps=1e-2,penalty=True,steady=True)
-         
-            # decrease regularization parameter
-            eps_ = np.flipud(np.logspace(-5,-2,10))
-            for j in range(eps_.size):
-                sol_n = solve_pde(domain,sol_n,N_f,0,dt,eps=eps_[j],penalty=False,steady=True)
 
+            # initialize solution on new domain        
+            sol_n = initialize(domain,N_f)
+    
             z_i,N_i = interp(sol_n,domain)     
             N[i,:] = N_i
             z[i,:] = z_i
@@ -186,3 +180,21 @@ def get_vel(N,v_i,domain):
     v_s_expr = v_i - (Dx(N,0)+ f)*k/((1-phi*S)**2)
     z,v_s = interp(v_s_expr,domain)  
     return v_s
+
+def initialize(domain,N_f):
+    # initialize effective stress solution given a domain
+    # and the boundary condition at the base
+    # this assumes that solution is rigid (dN/dt + v_i dN/dz = 0)
+    # so that N solves an elliptic pde 
+    V = FunctionSpace(domain, ("CG", 1))
+    z_l = domain.geometry.x[:,0].max()
+    z_b = domain.geometry.x[:,0].min()
+    sol_n = Function(V)
+    sol_n.interpolate(lambda x: 0.001*(x[0]-z_b)/(z_l-z_b) + N_f)
+    sol_n = solve_pde(domain,sol_n,N_f,0,1,eps=1e-2,penalty=True,steady=True)
+    
+    # decrease regularization parameter 
+    eps_ = np.flipud(np.logspace(-5,-2,10))
+    for j in range(eps_.size):
+        sol_n = solve_pde(domain,sol_n,N_f,0,1,eps=eps_[j],penalty=False,steady=True)
+    return sol_n

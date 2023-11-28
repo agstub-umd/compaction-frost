@@ -47,4 +47,3 @@ Tz_sc = Tz0*z_sc/(Tm-Tf)                      # dimensionless temperature gradie
 # domain parameters:
 nz = 500                                      # Number of elements in z direction
 z_f = (Ts-Tf)/(Tz0*z_sc)                      # base of fringe position
-

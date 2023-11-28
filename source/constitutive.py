@@ -1,13 +1,8 @@
 # this file contains some helper functions for the compaction problem solver
 
 import numpy as np
-from params import Tf, Tm, Ts, Tz0, a, b, gamma, z_sc
-from ufl import Dx
-
-
-def perm(S):
-      # scaled permeability as a function of ice saturation
-      return (1-S)**a
+from params import Tf, Tm, Ts, Tz0, a, alpha, b, d0, e0, z_sc
+from ufl import ln
 
 def Max(f1,f2):
      # max function
@@ -19,31 +14,41 @@ def sign(f):
 
 def sat(T):
      # ice saturation as a function of temperature
-     f = 1 - abs(1/(1+T))**b
+     f = 1 - abs(1/(1+T))**b 
      S0 = Max(0*T,f)*(1+sign(T))/2.
-     return S0
+     return S0  
+
+def perm(S):
+      # scaled permeability as a function of ice saturation
+      return (1-S)**a
 
 def temp(z):
      # undercooling temperature as a function of z
      return (Tf-Ts + Tz0*z_sc*z)/(Tm-Tf)
 
-def Lamda(phi):
-     # viscosity (coefficient on dw/dz)
-     return gamma*(4./3. + 1/phi)  
+def D(phi,S,eps=1e-10):
+     k = perm(S)
+     d = ((1-phi*S)**2)/ k
+     return (1-phi)/d +  eps
 
-def Nc(phi,w):
-     # deviatoric effective stress (compaction)
-     return - (1-phi)*Lamda(phi)*Dx(w,0)  
+def Phi(N,log=ln):
+     # porosity as a function of scaled effective stress
+     e = e0 - d0*log(N/alpha)/np.log(10)
+     return e/(e+1)
+     # # constant porosity:
+     # return 0.3 + 1e-20*N 
 
-def q(w,phi,S):
-     # water flux relative to rigid solution
-     return -(1-phi*S)*w 
+def dPhi(N,log=ln):
+     # (absolute value of) derivative of Phi w.r.t. N
+     return d0*np.log(10)/(N*(d0*log(N/alpha) - np.log(10)*(e0 + 1))**2)
+     # # constant porosity:
+     # return 1e-20*N
 
-def qr(V_heave,phi,S):
-     # water flux for rigid solution
-     # V_heave = v_i - v_s
-     return (1-phi*S)*V_heave
 
-# def Q(phi,S):
-#      # jump in heat flux across ice lenses
-#      return 0#(1-Ke(phi,S))*Tz_sc
+def get_fields(z):
+     # get saturation, temperature, and permeability fields
+     # given the z coordinate
+     T = temp(z)
+     S = sat(T)
+     k = perm(S)
+     return T,S,k

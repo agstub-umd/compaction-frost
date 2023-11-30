@@ -46,7 +46,7 @@ def plot_steady(N,z):
     T,S,k = get_fields(z)
  
     N_l = ((1-Phi(N,log=np.log)*S)*(1+T))[-1]
-    phi_l = Phi(N_l,log=np.log)
+    # phi_l = Phi(N_l,log=np.log)
 
     N_f = N[np.argmin(np.abs(z-z_f))]
 
@@ -56,6 +56,8 @@ def plot_steady(N,z):
     plt.figure(figsize=(8,6))
     plt.subplot(121)
     plt.plot(phi/phi[0],z-z_f,color='indigo',label=r'$\phi$')
+    # plt.plot(phi,z-z_f,color='indigo',label=r'$\phi$')
+    # plt.plot(S,z-z_f,color='crimson',label=r'$S$')
     plt.xticks(fontsize=16)
     plt.yticks(fontsize=16)
     plt.ylabel(r'$z-z_\mathrm{f}$',fontsize=16)
@@ -66,6 +68,7 @@ def plot_steady(N,z):
     plt.plot(N/N_f,z-z_f,color='indigo',label=r'$N$')
     plt.axhline(z_n,linestyle='--',color='springgreen',linewidth=2,label=r'$z_n$')
     plt.axvline(0,linestyle=':',color='k',linewidth=1)
+    plt.axvline(N_l/N_f,linestyle=':',color='goldenrod',linewidth=3)
     plt.xlim(-1,N.max()/N_f+1)
     plt.xticks(fontsize=16)
     plt.gca().yaxis.set_label_position("right")

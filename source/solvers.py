@@ -7,11 +7,10 @@ from dolfinx.fem.petsc import NonlinearProblem
 from dolfinx.mesh import create_interval, locate_entities_boundary
 from dolfinx.nls.petsc import NewtonSolver
 from mpi4py import MPI
-from params import G, nu, nz
+from params import nz
 from petsc4py import PETSc
 from post_process import interp
 from ufl import Dx, Measure, SpatialCoordinate, TestFunction, ds
-
 
 def weak_form(N,N_t,N_prev,v_i,domain,dt,eps,penalty,steady):
     # Weak form of the residual for the compaction problem
@@ -19,14 +18,16 @@ def weak_form(N,N_t,N_prev,v_i,domain,dt,eps,penalty,steady):
     T,S,k = get_fields(x[0])
     dz = Measure("dx", metadata={"quadrature_degree": 10})
 
-    phi = Phi(N) 
-
+    # wrap constants in dolfinx
     v_i = Constant(domain, PETSc.ScalarType(v_i)) 
     dt = Constant(domain, PETSc.ScalarType(dt))
     pen = Constant(domain, PETSc.ScalarType(1e6))
 
+    # define porosity
+    phi = Phi(N) 
+
     # define forcing function
-    f = (1-phi)*(G*(1-phi)*(nu-1) + (1+T)*Dx(phi*S,0))*k/((1-phi*S)**2)
+    f = (1-phi)*((1-phi) + (1+T)*Dx(phi*S,0))*k/((1-phi*S)**2)
 
     # define effective stress below ice lens
     N_l = (1-phi*S)*(1+T)
@@ -36,9 +37,11 @@ def weak_form(N,N_t,N_prev,v_i,domain,dt,eps,penalty,steady):
     F += dt*D(phi,S,eps)*Dx(N,0)*Dx(N_t,0)*dz - dt*Dx(f,0)*N_t*dz
   
     if steady == False:
+        # add evolution term for dynamic simulations
         F += dPhi(N)*(N-N_prev)*N_t*dz 
 
     if penalty == True:
+        # penalty method used in initialize() function
         F += pen*(N-N_l)*N_t*ds  
 
     return F
@@ -54,32 +57,38 @@ def solve_pde(domain,N_prev,N_f,v_i,dt,eps=1e-10,penalty = False,steady=False):
         # define weak form
         F = weak_form(N,N_t,N_prev,v_i,domain,dt,eps,penalty=penalty,steady=steady)  
 
+        # define effective stress boundary conditions
         x = SpatialCoordinate(domain)
         T,S,k = get_fields(x[0])
         z_,N_l = interp((1-Phi(N_prev)*S)*(1+T),domain)
         N_l = N_l[-1]
 
-        # # effective stress beneath lens
+        # effective stress beneath lens
         zl = domain.geometry.x[:,0].max()
         facets_l = locate_entities_boundary(domain, domain.topology.dim-1, lambda x: np.isclose(x[0],zl))
         dofs_l = locate_dofs_topological(V, domain.topology.dim-1, facets_l)
         bc_l = dirichletbc(PETSc.ScalarType(N_l), dofs_l,V)  
         
-        # # effective stress at base 
+        # effective stress at base 
         zb = domain.geometry.x[:,0].min()
         facets_b = locate_entities_boundary(domain, domain.topology.dim-1, lambda x: np.isclose(x[0],zb))
         dofs_b = locate_dofs_topological(V, domain.topology.dim-1, facets_b)
         bc_b = dirichletbc(PETSc.ScalarType(N_f), dofs_b,V)      
 
         if penalty == False:
+            # supply both boundary conditions if not
+            # using penalty method
             bcs = [bc_b,bc_l]
      
         elif penalty == True:
+            # only set boundary condition at base strongly 
+            # BC at lens is set weakly with a penalty method
             bcs = [bc_b]
 
+        # set initial guess for Newton solver
         N.interpolate(N_prev)
 
-        # Solve for phi
+        # solve for effective stress N
         problem = NonlinearProblem(F, N, bcs=bcs)
         solver = NewtonSolver(MPI.COMM_WORLD, problem)
 
@@ -87,7 +96,7 @@ def solve_pde(domain,N_prev,N_f,v_i,dt,eps=1e-10,penalty = False,steady=False):
       
         return N
 
-def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10,penalty=False):
+def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10):
     # solve the compaction problem given:
     # domain: the computational domain
     # initial: initial conditions 
@@ -123,7 +132,7 @@ def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10,penalty=False):
                   +', ('+str(np.size(np.where(new_lens==1)))+' ice lenses)'+' \r',end='')
            
         # solve the compaction problem for sol = N
-        sol = solve_pde(domain,sol_n,N_f,v_i,dt,eps,steady=False,penalty=penalty)
+        sol = solve_pde(domain,sol_n,N_f,v_i,dt,eps,steady=False,penalty=False)
 
         # save the solution as numpy arrays
         z_i,N_i = interp(sol,domain)   
@@ -147,7 +156,7 @@ def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10,penalty=False):
             domain = create_interval(MPI.COMM_WORLD,nz,[z_b,z_n])
 
             # initialize solution on new domain        
-            sol_n = initialize(domain,N_f)
+            sol_n = initialize(domain,N_f,eps_min=eps)
     
             z_i,N_i = interp(sol_n,domain)     
             N[i,:] = N_i
@@ -155,7 +164,7 @@ def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10,penalty=False):
          
         else:
             # calculate sediment velocity below ice lens
-            v_s = get_vel(sol,v_i,domain)[-1]
+            v_s = v_i - heave_rate(sol,domain)[-1]
 
             # evolve domain geometry according to velocity
             Z = domain.geometry.x
@@ -166,22 +175,20 @@ def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10,penalty=False):
             V = FunctionSpace(domain, ("CG", 1)) 
             sol_n = Function(V)
             sol_n.interpolate(sol)
-            sol_l = sol.x.array[-1]
-            sol_n.x.array[-1] = sol_l
+            sol_n.x.array[-1] = sol.x.array[-1]
 
     return N, z, new_lens
 
-def get_vel(N,v_i,domain):
+def heave_rate(N,domain):
     # calculate sediment velocity below ice lens
     phi = Phi(N)
     x = SpatialCoordinate(domain)
     T,S,k = get_fields(x[0])
-    f = G*(1-phi)*(nu-1) + (1+T)*Dx(phi*S,0)
-    v_s_expr = v_i - (Dx(N,0)+ f)*k/((1-phi*S)**2)
-    z,v_s = interp(v_s_expr,domain)  
-    return v_s
+    v_h =  (Dx(N,0)+ (1-phi) + (1+T)*Dx(phi*S,0))*k/((1-phi*S)**2)
+    z,heave = interp(v_h,domain)  
+    return heave
 
-def initialize(domain,N_f):
+def initialize(domain,N_f,eps_min=1e-10):
     # initialize effective stress solution given a domain
     # and the boundary condition at the base
     # this assumes that solution is rigid (dN/dt + v_i dN/dz = 0)
@@ -194,7 +201,7 @@ def initialize(domain,N_f):
     sol_n = solve_pde(domain,sol_n,N_f,0,1,eps=1e-2,penalty=True,steady=True)
     
     # decrease regularization parameter 
-    eps_ = np.flipud(np.logspace(-5,-2,10))
+    eps_ = np.flipud(np.logspace(np.log10(eps_min),-2,20))
     for j in range(eps_.size):
         sol_n = solve_pde(domain,sol_n,N_f,0,1,eps=eps_[j],penalty=False,steady=True)
     return sol_n

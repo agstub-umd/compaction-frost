@@ -1,7 +1,7 @@
 # all physical and numerical parameters are set here.
 
 # main parameters to set:
-k0 = 1.0e-13                                  # permeability pre-factor [m^2]
+k0 = 1.0e-15                                  # permeability pre-factor [m^2]
 Ts = 272                                      # temperature at surface [K]
 Tz0 = 25/1e3                                  # temperature gradient [K/m]
 
@@ -28,22 +28,21 @@ Lh = 3.34e5                                   # latent heat [J/kg]
 g_iw = 0.034                                  # interfacial energy [J/m^2]
 r_p = 1e-6                                    # pore throat radius [m]
 Tf = (1-2*g_iw/(r_p*rho_i*Lh))*Tm             # infiltration temperature [K]
-q_in = 0.07                                   # heat flux below fringe [W/m^2]
-Ki = 2.1                                      # thermal conductivity of ice [kg/(m s^3 K)]
 
 # scales 
 N_sc = 2*g_iw/r_p                             # effective stress scale
 T_sc = Tm*N_sc/(rho_i*Lh)                     # temperature scale
-z_sc = Ki*T_sc/q_in                           # depth scale
-v_sc = k0*N_sc/(mu*z_sc)                      # velocity scale
-t_sc = z_sc/v_sc                              # time scale
+z_sc = N_sc/((rho_s-rho_w)*g)                 # depth scale
+v_sc = k0*N_sc/(mu*z_sc)                      # *** velocity scale
+t_sc = z_sc/v_sc                              # *** time scale 
+
+# *** the time scale and velocity scale do not ***
+# *** influence any nondimensional parameters  ***
 
 # nondimensional parameters
-G = rho_w*g*z_sc/N_sc                         # gravitational parameter
-nu = rho_s/rho_w                              # density ratio
 alpha = 1e3/N_sc                              # plasticity [Pi]/[N]
 Tz_sc = Tz0*z_sc/(Tm-Tf)                      # dimensionless temperature gradient
 
 # domain parameters:
-nz = 500                                      # Number of elements in z direction
+nz = 1000                                     # Number of elements in z direction
 z_f = (Ts-Tf)/(Tz0*z_sc)                      # base of fringe position

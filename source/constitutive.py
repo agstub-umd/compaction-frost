@@ -40,10 +40,9 @@ def Phi(N,log=ln):
 
 def dPhi(N,log=ln):
      # (absolute value of) derivative of Phi w.r.t. N
-     return d0*np.log(10)/(N*(d0*log(N/alpha) - np.log(10)*(e0 + 1))**2)
+     return d0*np.log(10)/(N*(-d0*log(N/alpha) + np.log(10)*(e0 + 1))**2)
      # # constant porosity:
      # return 1e-20*N
-
 
 def get_fields(z):
      # get saturation, temperature, and permeability fields

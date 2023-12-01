@@ -40,9 +40,10 @@ t_sc = z_sc/v_sc                              # *** time scale
 # *** influence any nondimensional parameters  ***
 
 # nondimensional parameters
-alpha = 1e3/N_sc                              # plasticity [Pi]/[N]
-Tz_sc = Tz0*z_sc/(Tm-Tf)                      # dimensionless temperature gradient
+alpha = 1e3/N_sc                          # empirical stress parameter [Pi]/[N]
+Tz_sc = Tz0*z_sc/T_sc                     # dimensionless temperature gradient
 
 # domain parameters:
-nz = 1000                                     # Number of elements in z direction
-z_f = (Ts-Tf)/(Tz0*z_sc)                      # base of fringe position
+nz = 1000                                 # Number of elements in z direction
+
+

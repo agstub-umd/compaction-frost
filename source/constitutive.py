@@ -1,7 +1,7 @@
 # this file contains some helper functions for the compaction problem solver
 
 import numpy as np
-from params import Tf, Tm, Ts, Tz0, a, alpha, b, d0, e0, z_sc
+from params import Tz_sc, a, alpha, b, d0, e0
 from ufl import ln
 
 def Max(f1,f2):
@@ -24,7 +24,7 @@ def perm(S):
 
 def temp(z):
      # undercooling temperature as a function of z
-     return (Tf-Ts + Tz0*z_sc*z)/(Tm-Tf)
+     return Tz_sc*z
 
 def D(phi,S,eps=1e-10):
      k = perm(S)

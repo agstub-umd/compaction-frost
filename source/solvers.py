@@ -6,11 +6,14 @@ from dolfinx.fem import (Constant, Function, FunctionSpace, dirichletbc,
 from dolfinx.fem.petsc import NonlinearProblem
 from dolfinx.mesh import create_interval, locate_entities_boundary
 from dolfinx.nls.petsc import NewtonSolver
+from dolfinx.log import LogLevel, set_log_level
 from mpi4py import MPI
 from params import nz
 from petsc4py import PETSc
 from post_process import interp
 from ufl import Dx, Measure, SpatialCoordinate, TestFunction, ds
+
+
 
 def weak_form(N,N_t,N_prev,v_i,domain,dt,eps,penalty,steady):
     # Weak form of the residual for the compaction problem
@@ -91,10 +94,15 @@ def solve_pde(domain,N_prev,N_f,v_i,dt,eps=1e-10,penalty = False,steady=False):
         # solve for effective stress N
         problem = NonlinearProblem(F, N, bcs=bcs)
         solver = NewtonSolver(MPI.COMM_WORLD, problem)
+        solver.error_on_nonconvergence = False
 
-        solver.solve(N)
+        set_log_level(LogLevel.ERROR)
+
+        # return number of iterations n and 
+        # convergence flag
+        n,converged = solver.solve(N)
       
-        return N
+        return N,converged
 
 def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10):
     # solve the compaction problem given:
@@ -132,7 +140,15 @@ def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10):
                   +', ('+str(np.size(np.where(new_lens==1)))+' ice lenses)'+' \r',end='')
            
         # solve the compaction problem for sol = N
-        sol = solve_pde(domain,sol_n,N_f,v_i,dt,eps,steady=False,penalty=False)
+        sol,converged = solve_pde(domain,sol_n,N_f,v_i,dt,eps,steady=False,penalty=False)
+
+        if converged == False:
+            # exit loop and remove nans
+            N = np.nan_to_num(N)
+            N[N<1e-7] = 1e-7
+            N.min()
+            print('\n failed to converge...')
+            break
 
         # save the solution as numpy arrays
         z_i,N_i = interp(sol,domain)   
@@ -177,7 +193,7 @@ def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10):
             sol_n.interpolate(sol)
             sol_n.x.array[-1] = sol.x.array[-1]
 
-    return N, z, new_lens
+    return N, z, new_lens, converged
 
 def heave_rate(N,domain):
     # calculate sediment velocity below ice lens
@@ -198,10 +214,10 @@ def initialize(domain,N_f,eps_min=1e-10):
     z_b = domain.geometry.x[:,0].min()
     sol_n = Function(V)
     sol_n.interpolate(lambda x: 0.001*(x[0]-z_b)/(z_l-z_b) + N_f)
-    sol_n = solve_pde(domain,sol_n,N_f,0,1,eps=1e-2,penalty=True,steady=True)
+    sol_n, converged = solve_pde(domain,sol_n,N_f,0,1,eps=1e-2,penalty=True,steady=True)
     
     # decrease regularization parameter 
     eps_ = np.flipud(np.logspace(np.log10(eps_min),-2,20))
     for j in range(eps_.size):
-        sol_n = solve_pde(domain,sol_n,N_f,0,1,eps=eps_[j],penalty=False,steady=True)
+        sol_n, converged = solve_pde(domain,sol_n,N_f,0,1,eps=eps_[j],penalty=False,steady=True)
     return sol_n

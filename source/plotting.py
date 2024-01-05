@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.pylab as pl
 import matplotlib as mpl
 import numpy as np 
-from constitutive import get_fields, Phi 
+from constitutive import get_fields, Phi
 
 def plot(N,z,timesteps):
     plt.figure(figsize=(12,6))

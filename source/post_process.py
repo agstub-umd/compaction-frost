@@ -16,6 +16,6 @@ def interp(f,domain):
     points = (z)
     values = vals
     points_i = Z
-    F = griddata(points, values, points_i, method='linear')    
+    F = griddata(points, values, points_i, method='linear',fill_value=0.0)    
     return points_i,F
 

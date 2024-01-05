@@ -6,15 +6,10 @@ Ts = 272                                      # temperature at surface [K]
 Tz0 = 25/1e3                                  # temperature gradient [K/m]
 
 # porosity-stress relation empirical parameters
-# normal consolidation line
+# (normal consolidation line)
 phi0 = 0.445                                  # reference porosity at 1 kPa
 e0 = phi0/(1-phi0)                            # reference void ratio at 1 kPa
 d0 = 0.15                                     # stress parameter  
-
-# unloading-reloading line
-# phi0 = 0.33                                 # reference porosity at 1 kPa
-# e0 = phi0/(1-phi0)                          # reference void ratio at 1 kPa
-# d0 = 0.02                                   # stress parameter
 
 # physical parameters:
 g = 9.81                                      # gravitational acceleration [m/s^2]

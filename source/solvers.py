@@ -30,7 +30,7 @@ def weak_form(N,N_t,N_prev,v_i,domain,dt,eps,penalty,steady):
     phi = Phi(N) 
 
     # define forcing function
-    f = (1-phi)*((1-phi) + (1+T)*Dx(phi*S,0))*k/((1-phi*S)**2)
+    f = ((1-phi) + (1+T)*Dx(phi*S,0))*k*(1-phi)/((1-phi*S)**2)
 
     # define effective stress below ice lens
     N_l = (1-phi*S)*(1+T)
@@ -127,6 +127,7 @@ def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10):
     N = np.zeros((nt,nz+1))
     z = np.zeros((nt,nz+1))
     new_lens = np.zeros(nt)
+    heave = np.zeros((nt,nz+1))
 
     V = FunctionSpace(domain, ("CG", 1)) 
     sol_n = Function(V)
@@ -180,7 +181,8 @@ def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10):
          
         else:
             # calculate sediment velocity below ice lens
-            v_s = v_i - heave_rate(sol,domain)[-1]
+            heave[i,:] = heave_rate(sol,domain)
+            v_s = v_i - heave[i,-1]
 
             # evolve domain geometry according to velocity
             Z = domain.geometry.x
@@ -192,8 +194,12 @@ def time_stepping(domain,initial,N_f,v_i,timesteps,eps=1e-10):
             sol_n = Function(V)
             sol_n.interpolate(sol)
             sol_n.x.array[-1] = sol.x.array[-1]
+    
+    # remove nans at temporal jumps
+    heave = np.nan_to_num(heave)
+    N = np.nan_to_num(N)        
 
-    return N, z, new_lens, converged
+    return N, z, new_lens,heave, converged
 
 def heave_rate(N,domain):
     # calculate sediment velocity below ice lens

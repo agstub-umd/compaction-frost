@@ -40,5 +40,3 @@ Tz_sc = Tz0*z_sc/T_sc                     # dimensionless temperature gradient
 
 # domain parameters:
 nz = 1000                                 # Number of elements in z direction
-
-

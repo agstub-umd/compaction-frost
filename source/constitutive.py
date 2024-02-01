@@ -36,7 +36,7 @@ def Phi(N,log=ln):
      e = e0 - d0*log(N/alpha)/np.log(10)
      return e/(e+1)
      # # constant porosity:
-     # return 0.35 + 1e-20*N 
+     # return 0.325 + 1e-20*N 
 
 def dPhi(N,log=ln):
      # (absolute value of) derivative of Phi w.r.t. N

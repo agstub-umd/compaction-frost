@@ -16,7 +16,11 @@ def sat(T):
      # ice saturation as a function of temperature
      f = 1 - abs(1/(1+T))**b 
      S0 = Max(0*T,f)*(1+sign(T))/2.
-     return S0  
+     return S0
+
+def sat_T(T):
+     # derivative of saturation with respect to T
+     return 0.5*sign(T + 1)/np.abs(T + 1)**1.5       
 
 def perm(S):
       # scaled permeability as a function of ice saturation

@@ -31,12 +31,19 @@ z_sc = N_sc/((rho_s-rho_w)*g)                 # depth scale
 v_sc = k0*N_sc/(mu*z_sc)                      # *** velocity scale
 t_sc = z_sc/v_sc                              # *** time scale 
 
-# *** the time scale and velocity scale do not ***
-# *** influence any nondimensional parameters  ***
-
 # nondimensional parameters
-alpha = 1e3/N_sc                          # empirical stress parameter [Pi]/[N]
+alpha = 1e3/N_sc                          # empirical stress scale N_0/[N]
 Tz_sc = Tz0*z_sc/T_sc                     # dimensionless temperature gradient
 
 # domain parameters:
 nz = 1000                                 # Number of elements in z direction
+
+# import numpy as np
+# gamma = 1
+# zeta = gamma*z_sc*N_sc/v_sc
+# compact_length = np.sqrt((k0/mu)*zeta)
+
+# print(compact_length)
+# print(z_sc)
+# print(np.log10(zeta))
+

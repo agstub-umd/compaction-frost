@@ -2,7 +2,8 @@
 
 import numpy as np
 from params import Tz_sc, a, alpha, b, d0, e0
-from ufl import ln
+from ufl import ln, Dx
+from scipy.optimize import root_scalar
 
 def Max(f1,f2):
      # max function
@@ -35,18 +36,27 @@ def D(phi,S,eps=1e-10):
      d = ((1-phi*S)**2)/ k
      return (1-phi)/d +  eps
 
-def Phi(N,log=ln):
+def Phi(N,log=ln,const_phi=False):
      # porosity as a function of scaled effective stress
-     e = e0 - d0*log(N/alpha)/np.log(10)
-     return e/(e+1)
-     # # constant porosity:
-     # return 0.325 + 1e-20*N 
-
-def dPhi(N,log=ln):
+     if const_phi == False:
+          # empirical consolidation law
+          e = e0 - d0*log(N/alpha)/np.log(10)
+          P = e/(e+1)
+     else:
+          # constant porosity
+          P = 0.325 + 1e-20*N 
+     return P
+   
+def dPhi(N,log=ln,const_phi=False):
      # (absolute value of) derivative of Phi w.r.t. N
-     return d0*np.log(10)/(N*(-d0*log(N/alpha) + np.log(10)*(e0 + 1))**2)
-     # # constant porosity:
-     # return 1e-20*N
+     if const_phi == False:
+          # empirical consolidation law
+          dP = d0*np.log(10)/(N*(-d0*log(N/alpha) + np.log(10)*(e0 + 1))**2)
+     else:
+          # constant porosity
+          dP = 1e-20*N     
+     return dP
+
 
 def get_fields(z):
      # get saturation, temperature, and permeability fields
@@ -55,3 +65,16 @@ def get_fields(z):
      S = sat(T)
      k = perm(S)
      return T,S,k
+
+def N_visc(v,phi,gamma):
+     # viscous component of effective stress
+     # due to ice creep in/out of pores
+     if gamma>0:
+          N_v = (1-phi)*gamma*Dx(v,0)
+     else:
+          N_v = 1e-20*v     
+     return N_v
+
+def Phi_lens(z):
+    res = lambda phi,z: phi - Phi((1-phi*sat(temp(z)))*(1+temp(z)),log=np.log)
+    return root_scalar(lambda phi: res(phi,z),x0 = 0.25,bracket = [0,1]).root   

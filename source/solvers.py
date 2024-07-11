@@ -58,6 +58,7 @@ def weak_form_N(N,N_t,N_n,v,gamma,const_phi,v_i,domain,dt,eps,penalty,elliptic):
 
 
 def weak_form_v(v,v_t,N,domain,gamma,const_phi):
+    # weak form of the elliptic equation for the heave rate
     dz = Measure("dx", metadata={"quadrature_degree": 10})
     x = SpatialCoordinate(domain)
     T,S,k = get_fields(x[0])
@@ -87,7 +88,7 @@ def solve_pde(domain,sol_n,N_f,gamma,const_phi,v_i,dt,eps=1e-10,penalty = False,
         (N,v) = split(sol)
         (N_t,v_t) = TestFunctions(V)
 
-        # define weak form
+        # define weak forms
         F_N = weak_form_N(N,N_t,sol_n.sub(0),v,gamma,const_phi,v_i,domain,dt,eps,penalty=penalty,elliptic=elliptic)  
         F_v = weak_form_v(v,v_t,N,domain,gamma,const_phi)
 
@@ -148,7 +149,7 @@ def solve_pde(domain,sol_n,N_f,gamma,const_phi,v_i,dt,eps=1e-10,penalty = False,
       
         return sol,converged
 
-def time_stepping(domain,initial,N_f,N_c,gamma,const_phi,v_i,timesteps,eps=1e-10):
+def time_stepping(domain,initial,N_f,N_c,gamma,const_phi,v_i,timesteps,eps=1e-10,break_init=False):
     # solve the compaction problem given:
     # domain: the computational domain
     # initial: initial conditions 
@@ -164,7 +165,7 @@ def time_stepping(domain,initial,N_f,N_c,gamma,const_phi,v_i,timesteps,eps=1e-10
     # v: heave rate (solution)
     # z: domain coordinates (change over time due ice lens motion)
     # new_lens: array of time steps when a new lens forms (new lens == 1, otherwise 0)
-
+    # converged: convergence flag (True or False)
 
     dt = timesteps[1]-timesteps[0]
     nt = np.size(timesteps)
@@ -242,6 +243,9 @@ def time_stepping(domain,initial,N_f,N_c,gamma,const_phi,v_i,timesteps,eps=1e-10
             heave[i,:] = heave_i 
             visc[i,:] = visc_i
             z[i,:] = z_i
+
+            if break_init == True:
+                break
          
         else:
             # evolve domain geometry according to ice velocity
@@ -271,7 +275,7 @@ def time_stepping(domain,initial,N_f,N_c,gamma,const_phi,v_i,timesteps,eps=1e-10
 def initialize(domain,N_f,gamma,const_phi,eps_min=1e-10):
     # initialize effective stress solution given a domain
     # and the boundary condition at the base
-    # this assumes that solution is rigid (dN/dt + v_i dN/dz = 0)
+    # this assumes that the material derivative vanishes(dN/dt + v_i dN/dz = 0)
     # so that N solves an elliptic pde 
 
     P1 = FiniteElement('P',domain.ufl_cell(),1)     
@@ -292,6 +296,7 @@ def initialize(domain,N_f,gamma,const_phi,eps_min=1e-10):
 
 
 def heave_plastic(N,domain,const_phi):
+    # heave rate for the perfectly plastic problem
     phi = Phi(N,const_phi=const_phi)
     x = SpatialCoordinate(domain)
     T,S,k = get_fields(x[0])

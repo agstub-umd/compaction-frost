@@ -1,3 +1,5 @@
+# interpolation function for converting dolfinx functions
+# to numpy arrays for plotting
 import numpy as np
 from dolfinx.fem import Expression, Function, FunctionSpace
 from params import nz

@@ -1,8 +1,7 @@
 # all physical and numerical parameters are set here.
 
 # main parameters to set:
-k0 = 1.0e-15                                  # permeability pre-factor [m^2]
-Ts = 272                                      # temperature at surface [K]
+k0 = 6.0e-14                                  # permeability pre-factor [m^2]
 Tz0 = 25/1e3                                  # temperature gradient [K/m]
 
 # porosity-stress relation empirical parameters
@@ -32,18 +31,37 @@ v_sc = k0*N_sc/(mu*z_sc)                      # *** velocity scale
 t_sc = z_sc/v_sc                              # *** time scale 
 
 # nondimensional parameters
-alpha = 1e3/N_sc                          # empirical stress scale N_0/[N]
-Tz_sc = Tz0*z_sc/T_sc                     # dimensionless temperature gradient
+alpha = 1e3/N_sc                              # empirical stress scale N_0/[N]
+Tz_sc = Tz0*z_sc/T_sc                         # dimensionless temperature gradient
 
 # domain parameters:
-nz = 1000                                 # Number of elements in z direction
+nz = 1000                                     # Number of elements in z direction
 
+
+
+## print some scales
+## (example values for gamma, zeta, compaction length) 
 # import numpy as np
-# gamma = 1
+# gamma = 4**2
 # zeta = gamma*z_sc*N_sc/v_sc
-# compact_length = np.sqrt((k0/mu)*zeta)
+# compact_length = ((k0/mu)*zeta)**0.5
+# print('compaction length = '+str(np.round(compact_length,2))+' m')
+# print('\n')
+# print('With [k] = 10^'+str(str(np.round(np.log10(k0),1)))+' m^2:')
+# print('[z] = '+str(z_sc)+' m')
+# print('[t] = '+str(np.round(t_sc/3.154e7,3))+' yr')
+# print('[v] = '+str(np.round(v_sc*3.154e7,3))+' m/yr')
+# print('\n')
+# print('example calculations for FIG 6:')
+# print('v_i paper ~ 0.038*[v] --> '+str(np.round(3.8e-2*v_sc*3.154e7,3))+' m/yr')
+# print('v_* paper ~ 0.2*v_i --> '+str(np.round(0.2*3.8e-2*v_sc*3.154e7,3))+' m/yr')
+# print('t_max ~ 3000*[t] --> '+str(np.round(3e3*t_sc/3.154e7,2))+' yr')
+# print('t_lens ~ t_max/18 --> '+str(np.round((1/18.)*3e3*t_sc/3.154e7,2))+' yr')
+# print('max zeta --> '+'{:.2e}'.format(zeta)+' Pa s')
+# print('\n')
 
-# print(compact_length)
-# print(z_sc)
-# print(np.log10(zeta))
-
+# p_sc = 1e4
+# z_l = 10
+# eta_i = 5e14
+# nu = (p_sc*z_sc / (2*eta_i*v_sc)) 
+# print('nu = '+'{:.2e}'.format(nu))
